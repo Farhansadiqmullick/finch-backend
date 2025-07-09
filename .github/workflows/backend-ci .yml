@@ -9,16 +9,18 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  DOCKER_TAG: ${{ github.ref == 'refs/heads/main' && 'latest' || github.ref_name }}
+  IMAGE_NAME: farhanmullick/finch-backend
+  TAG: latest
+  POSTGRES_HOST: localhost
   POSTGRES_USER: roy77
   POSTGRES_PASSWORD: asdf1234@77
   POSTGRES_DB: fleetdb
 
 jobs:
   test:
-    name: Run Tests
+    name: Django Checks & Unit Tests
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:15
@@ -28,72 +30,64 @@ jobs:
           POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
           - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+        options: >-
+          --health-cmd="pg_isready -U roy77"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
         volumes:
           - postgres_data:/var/lib/postgresql/data
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: 3.10
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        # First try with exact versions
-        pip install -r requirements.txt || \
-        # If fails, try with relaxed version constraints
-        pip install -r requirements.txt --use-deprecated=legacy-resolver || \
-        pip install pytest pytest-cov
+        python -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
 
-    - name: Run tests
-      env:
-        DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
-        POSTGRES_HOST: localhost
-        PYTHONUNBUFFERED: 1
+    - name: Wait for PostgreSQL to be ready
       run: |
-        # OR Option B: Run all tests in api folder
-        pytest api/ --cov=./ --cov-report=xml
+        until pg_isready -h localhost -U roy77; do
+          echo "Waiting for postgres..."
+          sleep 2
+        done
 
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
+    - name: Run Django checks
+      run: |
+        source venv/bin/activate
+        python manage.py check
 
   build-and-push:
     name: Build and Push Docker Image
     needs: test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@v2
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=${{ env.DOCKER_TAG }}
-            type=raw,value=3-tire-back
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
         with:
           context: .
+          file: Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.IMAGE_NAME }}:${{ env.TAG }}
+          platforms: linux/amd64,linux/arm64
