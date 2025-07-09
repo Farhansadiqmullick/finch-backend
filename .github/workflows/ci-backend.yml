@@ -11,6 +11,9 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   DOCKER_TAG: ${{ github.ref == 'refs/heads/main' && 'latest' || github.ref_name }}
+  POSTGRES_USER: roy77
+  POSTGRES_PASSWORD: asdf1234@77
+  POSTGRES_DB: fleetdb
 
 jobs:
   test:
@@ -18,14 +21,16 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:13
+        image: postgres:15
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: testdb
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+        volumes:
+          - postgres_data:/var/lib/postgresql/data
 
     steps:
     - uses: actions/checkout@v3
@@ -33,7 +38,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: '3.8'
 
     - name: Install dependencies
       run: |
@@ -43,7 +48,9 @@ jobs:
 
     - name: Run tests
       env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/testdb
+        DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+        POSTGRES_HOST: localhost
+        PYTHONUNBUFFERED: 1
       run: |
         pytest --cov=./ --cov-report=xml
 
@@ -77,6 +84,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ env.DOCKER_TAG }}
+            type=raw,value=3-tire-back
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
