@@ -47,8 +47,6 @@ jobs:
         pip install -r requirements.txt || \
         # If fails, try with relaxed version constraints
         pip install -r requirements.txt --use-deprecated=legacy-resolver || \
-        # As last resort, install problematic packages separately
-        pip install "aiohappyeyeballs>=2.4.0,<2.5.0" && pip install -r requirements.txt --ignore-installed
         pip install pytest pytest-cov
 
     - name: Run tests
@@ -57,7 +55,8 @@ jobs:
         POSTGRES_HOST: localhost
         PYTHONUNBUFFERED: 1
       run: |
-        pytest --cov=./ --cov-report=xml
+        # OR Option B: Run all tests in api folder
+        pytest api/ --cov=./ --cov-report=xml
 
     - name: Upload coverage
       uses: codecov/codecov-action@v3
