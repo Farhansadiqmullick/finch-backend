@@ -14,6 +14,12 @@ env:
   POSTGRES_USER: roy77
   POSTGRES_PASSWORD: asdf1234@77
   POSTGRES_DB: fleetdb
+  STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+  STRIPE_PUBLIC_KEY: ${{ secrets.STRIPE_PUBLIC_KEY }}
+  STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+  DJANGO_SUPERUSER_USERNAME: ${{ secrets.DJANGO_SUPERUSER_USERNAME }}
+  DJANGO_SUPERUSER_EMAIL: ${{ secrets.DJANGO_SUPERUSER_EMAIL }}
+  DJANGO_SUPERUSER_PASSWORD: ${{ secrets.DJANGO_SUPERUSER_PASSWORD }}
 
 jobs:
   test:
@@ -48,7 +54,7 @@ jobs:
       run: |
         docker run --rm \
           --network host \
-          -e POSTGRES_HOST=db \
+          -e POSTGRES_HOST=${{ env.POSTGRES_HOST }} \
           -e POSTGRES_USER=${{ env.POSTGRES_USER }} \
           -e POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }} \
           -e POSTGRES_DB=${{ env.POSTGRES_DB }} \
