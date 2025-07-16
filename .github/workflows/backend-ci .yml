@@ -10,7 +10,7 @@ on:
 env:
   IMAGE_NAME: farhanmullick/finch-backend
   TAG: latest
-  POSTGRES_HOST: db
+  POSTGRES_HOST: localhost
   POSTGRES_USER: roy77
   POSTGRES_PASSWORD: asdf1234@77
   POSTGRES_DB: fleetdb
@@ -36,29 +36,38 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U roy77"
+          --health-cmd="pg_isready -U ${{ env.POSTGRES_USER }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-        volumes:
-          - postgres_data:/var/lib/postgresql/data
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Build Docker image
-      run: docker build -t ${IMAGE_NAME}:${TAG} .
+      - name: Install Python & Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3 python3-pip libpq-dev
+          pip3 install --upgrade pip
+          pip3 install -r requirements.txt
 
-    - name: Run tests inside Docker container
-      run: |
-        docker run --rm \
-          --network host \
-          -e POSTGRES_HOST=${{ env.POSTGRES_HOST }} \
-          -e POSTGRES_USER=${{ env.POSTGRES_USER }} \
-          -e POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }} \
-          -e POSTGRES_DB=${{ env.POSTGRES_DB }} \
-          ${IMAGE_NAME}:${TAG} bash -c "python3 manage.py migrate && python3 manage.py test"
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until pg_isready -h $POSTGRES_HOST -U $POSTGRES_USER; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Run Django Migrations and Tests
+        env:
+          POSTGRES_HOST: ${{ env.POSTGRES_HOST }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        run: |
+          python3 manage.py migrate
+          python3 manage.py test
 
   build-and-push:
     name: Build and Push Docker Image
