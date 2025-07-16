@@ -48,7 +48,7 @@ jobs:
       run: |
         docker run --rm \
           --network host \
-          -e POSTGRES_HOST=localhost \
+          -e POSTGRES_HOST=db \
           -e POSTGRES_USER=${{ env.POSTGRES_USER }} \
           -e POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }} \
           -e POSTGRES_DB=${{ env.POSTGRES_DB }} \
