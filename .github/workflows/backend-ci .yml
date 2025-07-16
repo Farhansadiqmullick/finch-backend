@@ -8,21 +8,12 @@ on:
     branches: [ main ]
 
 env:
-  REGISTRY: ghcr.io
   IMAGE_NAME: farhanmullick/finch-backend
   TAG: latest
-  POSTGRES_HOST: localhost
+  POSTGRES_HOST: db
   POSTGRES_USER: roy77
   POSTGRES_PASSWORD: asdf1234@77
   POSTGRES_DB: fleetdb
-  STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-  STRIPE_PUBLIC_KEY: ${{ secrets.STRIPE_PUBLIC_KEY }}
-  STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-  DJANGO_SUPERUSER_USERNAME: ${{ secrets.DJANGO_SUPERUSER_USERNAME }}
-  DJANGO_SUPERUSER_EMAIL: ${{ secrets.DJANGO_SUPERUSER_EMAIL }}
-  DJANGO_SUPERUSER_PASSWORD: ${{ secrets.DJANGO_SUPERUSER_PASSWORD }}
-  SITE_URL: http://93.127.195.189:5000
-  FORNTEND_SITE_URL: https://finch-development.vercel.app
 
 jobs:
   test:
@@ -39,7 +30,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U roy77"
+          --health-cmd="pg_isready -h db -U roy77"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -47,31 +38,21 @@ jobs:
           - postgres_data:/var/lib/postgresql/data
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+    - name: Build Docker image
+      run: docker build -t ${IMAGE_NAME}:${TAG} .
 
-    - name: Install dependencies
+    - name: Run tests inside Docker container
       run: |
-        python -m venv venv
-        source venv/bin/activate
-        pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Wait for PostgreSQL to be ready
-      run: |
-        until pg_isready -h localhost -U roy77; do
-          echo "Waiting for postgres..."
-          sleep 2
-        done
-
-    - name: Run Django checks
-      run: |
-        source venv/bin/activate
-        python manage.py check
+        docker run --rm \
+          --network host \
+          -e POSTGRES_HOST=localhost \
+          -e POSTGRES_USER=${{ env.POSTGRES_USER }} \
+          -e POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }} \
+          -e POSTGRES_DB=${{ env.POSTGRES_DB }} \
+          ${IMAGE_NAME}:${TAG} bash -c "python3 manage.py migrate && python3 manage.py test"
 
   build-and-push:
     name: Build and Push Docker Image

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: db
-  namespace: django-app
+  namespace: monitoring
 spec:
   type: ClusterIP
   ports:

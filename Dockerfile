@@ -19,32 +19,12 @@ RUN apt-get update && \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
+# Copy and install requirements
 COPY requirements.txt .
-RUN python3 -m venv venv1 && \
-    . venv1/bin/activate && \
-    pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Production stage
-FROM ubuntu:22.04 AS production
-
-WORKDIR /app
-
-# Install only runtime dependencies (including PostgreSQL client libraries)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    python3 \
-    python3-venv \
-    libpq5 \
-    && apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy virtual environment from builder stage
-COPY --from=builder /app/venv1 /app/venv1
-
-# Copy application code
-COPY . /app/
+# Copy your Django app code
+COPY . .
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
@@ -53,4 +33,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["/bin/bash", "-c", "source venv1/bin/activate && python manage.py migrate && python manage.py createsuperuser --noinput && python manage.py runserver 0.0.0.0:8000"]
+CMD ["bash", "-c", "python3 manage.py migrate && python3 manage.py runserver 0.0.0.0:8000"]

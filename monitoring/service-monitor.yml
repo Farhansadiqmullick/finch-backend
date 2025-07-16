@@ -1,0 +1,20 @@
+# django-service-monitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: django-app-monitor
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  jobLabel: django-app
+  selector:
+    matchLabels:
+      app: django-app  # Change this to match your Django app's service label
+  namespaceSelector:
+    matchNames:
+      - django-app
+  endpoints:
+  - port: web  # Change this to match your service port name
+    path: /metrics
+    interval: 15s
